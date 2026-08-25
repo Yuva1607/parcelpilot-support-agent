@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>ParcelPilot Support Agent</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+
+    .app {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .header {
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .header p {
+      margin: 0;
+      color: #6b7280;
+    }
+
+    .chat {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .message {
+      margin-bottom: 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      max-width: 80%;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      margin-left: auto;
+      background: #2563eb;
+      color: white;
+    }
+
+    .assistant {
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .input-area {
+      border-top: 1px solid #e5e7eb;
+      padding: 16px;
+      display: flex;
+      gap: 10px;
+    }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      min-height: 50px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 15px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 0 22px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app">
+
+    <div class="header">
+      <h1>ParcelPilot Support Agent</h1>
+      <p>
+        AI-powered support assistant for orders, policies, accounts and escalations.
+      </p>
+    </div>
+
+    <div class="chat">
+
+      <div class="messages" id="messages">
+        <div class="message assistant">
+          Hello! I can help with ParcelPilot orders, customer accounts,
+          policies and support issues.
+        </div>
+      </div>
+
+      <div class="input-area">
+
+        <textarea
+          id="messageInput"
+          placeholder="Ask about an order, account, policy..."
+        ></textarea>
+
+        <button id="sendButton">
+          Send
+        </button>
+
+      </div>
+
+    </div>
+
+    <div class="status" id="status"></div>
+
+  </div>
+
+  <script>
+    const messages = document.getElementById('messages');
+    const input = document.getElementById('messageInput');
+    const button = document.getElementById('sendButton');
+    const status = document.getElementById('status');
+
+    function addMessage(text, type) {
+      const div = document.createElement('div');
+
+      div.className = `message ${type}`;
+      div.textContent = text;
+
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const message = input.value.trim();
+
+      if (!message) {
+        return;
+      }
+
+      addMessage(message, 'user');
+
+      input.value = '';
+      button.disabled = true;
+      status.textContent = 'Agent is thinking...';
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ message })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || data.error || 'Request failed'
+          );
+        }
+
+        addMessage(
+          data.response || 'No response generated.',
+          'assistant'
+        );
+
+        if (data.type === 'confirmation_required') {
+          status.textContent =
+            'Confirmation required before creating the escalation.';
+        } else {
+          status.textContent = '';
+        }
+
+      } catch (error) {
+        addMessage(
+          `Error: ${error.message}`,
+          'assistant'
+        );
+
+        status.textContent = 'Something went wrong.';
+      }
+
+      button.disabled = false;
+      input.focus();
+    }
+
+    button.addEventListener('click', sendMessage);
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+
+</body>
+</html>
