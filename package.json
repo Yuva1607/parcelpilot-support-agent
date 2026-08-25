@@ -1,0 +1,30 @@
+{
+  "name": "parcelpilot-support-agent",
+  "version": "1.0.0",
+  "description": "AI support agent for ParcelPilot for an assessment",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yuva1607/parcelpilot-support-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Yuva1607/parcelpilot-support-agent/issues"
+  },
+  "homepage": "https://github.com/Yuva1607/parcelpilot-support-agent#readme",
+  "dependencies": {
+    "@google/genai": "^2.18.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pdf-parse": "^2.4.5",
+    "xlsx": "^0.18.5"
+  }
+}
