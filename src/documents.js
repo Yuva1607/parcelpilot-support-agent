@@ -48,7 +48,32 @@ async function buildDocumentIndex() {
   return allChunks;
 }
 
-module.exports = { buildDocumentIndex, DOCUMENT_REGISTRY };
+module.exports = { buildDocumentIndex, DOCUMENT_REGISTRY, searchDocuments };
+
+// Very small keyword-overlap search — fine at this corpus size (23 chunks).
+// Scores by matching word count, then boosts by source priority (lower = more authoritative),
+// and boosts chunks scoped to the querying account's own contract.
+function searchDocuments(chunks, query, { accountId = null, topK = 5 } = {}) {
+  const queryWords = query.toLowerCase().match(/[a-z0-9]+/g) || [];
+
+  const scored = chunks.map((chunk) => {
+    const chunkWords = chunk.text.toLowerCase();
+    let matchCount = 0;
+    for (const w of queryWords) {
+      if (w.length > 2 && chunkWords.includes(w)) matchCount++;
+    }
+    if (matchCount === 0) return null;
+
+    let score = matchCount * 10 - chunk.priority;
+    if (accountId && chunk.account_id === accountId) score += 15;
+    if (chunk.status === 'deprecated') score -= 50;
+
+    return { ...chunk, score };
+  }).filter(Boolean);
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
 
 if (require.main === module) {
   buildDocumentIndex().then((chunks) => {
