@@ -27,12 +27,14 @@ const tools = [
             },
             accountId: {
               type: 'STRING',
-              description: 'Optional account ID for account-specific contract search'
+              description:
+                'Optional account ID for account-specific contract search'
             }
           },
           required: ['query']
         }
       },
+
       {
         name: 'query_account_data',
         description:
@@ -65,10 +67,11 @@ const tools = [
           required: ['queryType']
         }
       },
+
       {
         name: 'create_escalation',
         description:
-          'Create an escalation. This changes system state and must only be called after the user explicitly confirms they want the escalation created.',
+          'Create an escalation. This is a state-changing action. NEVER call this tool unless the user has explicitly confirmed that they want the escalation created.',
         parameters: {
           type: 'OBJECT',
           properties: {
@@ -99,18 +102,42 @@ const tools = [
 const systemInstruction = `
 You are ParcelPilot's internal support assistant.
 
-Use tools to answer questions accurately.
+Use the available tools to answer support questions accurately.
 
 Rules:
 - Use query_account_data for account, order, or ticket facts.
 - Use search_documents for policies, SOPs, contracts, SLAs, service credits, and product documentation.
 - Customer-specific agreements override generic policies when applicable.
-- Do not use deprecated documents unless no relevant current document exists.
+- Do not use deprecated documents when a current relevant document exists.
 - Never invent information.
-- If a question requires both structured data and policy information, call multiple tools as needed.
-- Before calling create_escalation, ask the user for explicit confirmation unless they have already explicitly confirmed.
-- After all required tool calls are complete, give a clear, concise answer.
+- You may use multiple tools when necessary.
+- create_escalation is a state-changing action.
+- NEVER call create_escalation unless the user has explicitly confirmed that they want the escalation created.
+- If an escalation is appropriate but the user has not confirmed, explain what would be escalated and ask for confirmation.
+- Once the user explicitly confirms, you may call create_escalation.
+- Keep answers concise and clear.
 `;
+
+function isExplicitConfirmation(message) {
+  const confirmation = message.toLowerCase().trim();
+
+  return (
+    confirmation === 'yes' ||
+    confirmation === 'yes please' ||
+    confirmation === 'confirm' ||
+    confirmation === 'confirmed' ||
+    confirmation === 'proceed' ||
+    confirmation === 'go ahead' ||
+    confirmation === 'do it' ||
+    confirmation === 'create it' ||
+    confirmation === 'create the escalation' ||
+    confirmation === 'escalate it' ||
+    confirmation.startsWith('yes,') ||
+    confirmation.startsWith('yes please') ||
+    confirmation.startsWith('confirm ') ||
+    confirmation.startsWith('go ahead')
+  );
+}
 
 async function executeTool(functionCall, context) {
   const args = functionCall.args || {};
@@ -157,7 +184,7 @@ async function runAgent(message, context = { role: 'agent' }) {
 
     const functionCalls = response.functionCalls || [];
 
-    // No more tools requested: Gemini has produced the final answer
+    // Gemini has finished using tools and is returning its final answer
     if (functionCalls.length === 0) {
       return {
         type: 'message',
@@ -166,14 +193,25 @@ async function runAgent(message, context = { role: 'agent' }) {
       };
     }
 
-    // Preserve the exact Gemini response, including thought signatures
+    // Preserve Gemini's original response including thought_signature
     contents.push({
       role: 'model',
       parts: response.candidates[0].content.parts
     });
 
-    // Execute every requested tool
     for (const functionCall of functionCalls) {
+      // State-changing action requires explicit confirmation
+      if (functionCall.name === 'create_escalation') {
+        if (!isExplicitConfirmation(message)) {
+          return {
+            type: 'confirmation_required',
+            toolsUsed,
+            response:
+              'I can create this escalation, but this will create a new escalation record. Please confirm that you want me to proceed.'
+          };
+        }
+      }
+
       const result = await executeTool(functionCall, context);
 
       toolsUsed.push({
@@ -206,7 +244,7 @@ module.exports = { runAgent };
 
 if (require.main === module) {
   runAgent(
-    'Can Northstar Logistics cancel order ORD-1001 without paying a cancellation fee?'
+    'Yes, please proceed with the P1 escalation for Northstar Logistics order ORD-1001.'
   )
     .then((result) => {
       console.log(JSON.stringify(result, null, 2));
