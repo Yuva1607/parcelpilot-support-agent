@@ -219,6 +219,18 @@ async function runAgent(message, context = { role: 'agent' }) {
         args: functionCall.args
       });
 
+      // IMPORTANT:
+      // Once the escalation is created, stop the tool-calling loop
+      // and return success immediately.
+      if (functionCall.name === 'create_escalation') {
+        return {
+          type: 'message',
+          toolsUsed,
+          response: 'The escalation has been created successfully.',
+          result
+        };
+      }
+
       contents.push({
         role: 'user',
         parts: [
